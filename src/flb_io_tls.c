@@ -350,7 +350,6 @@ int flb_io_tls_net_read(struct flb_thread *th, struct flb_upstream_conn *u_conn,
                         void *buf, size_t len)
 {
     int ret;
-    struct flb_upstream *u = u_conn->u;
 
  retry_read:
     ret = mbedtls_ssl_read(&u_conn->tls_session->ssl, buf, len);
@@ -364,11 +363,6 @@ int flb_io_tls_net_read(struct flb_thread *th, struct flb_upstream_conn *u_conn,
         char err_buf[72];
         mbedtls_strerror(ret, err_buf, sizeof(err_buf));
         flb_error("[tls] SSL error: %s", err_buf);
-
-        /* There was an error transmitting data */
-        mk_event_del(u->evl, &u_conn->event);
-        flb_tls_session_destroy(u_conn->tls_session);
-        u_conn->tls_session = NULL;
         return -1;
     }
 
