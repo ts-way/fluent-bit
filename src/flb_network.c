@@ -279,6 +279,15 @@ int flb_net_tcp_fd_connect(flb_sockfd_t fd, char *host, unsigned long port)
 
 flb_sockfd_t flb_net_server(char *port, char *listen_addr)
 {
+    /**
+     * Shortcut to flb_net_server(..., ..., IPPROTO_TCP)
+    */
+
+    return flb_net_server_create(port, listen_addr, IPPROTO_TCP);
+}
+
+flb_sockfd_t flb_net_server_create(char *port, char *listen_addr, int protocol)
+{
     flb_sockfd_t fd = -1;
     int ret;
     struct addrinfo hints;
@@ -286,8 +295,9 @@ flb_sockfd_t flb_net_server(char *port, char *listen_addr)
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_socktype = (protocol == IPPROTO_TCP) ? SOCK_STREAM : SOCK_DGRAM;
     hints.ai_flags = AI_PASSIVE;
+    hints.ai_protocol = protocol;
 
     ret = getaddrinfo(listen_addr, port, &hints, &res);
     if (ret != 0) {
@@ -297,16 +307,22 @@ flb_sockfd_t flb_net_server(char *port, char *listen_addr)
     }
 
     for (rp = res; rp != NULL; rp = rp->ai_next) {
-        fd = flb_net_socket_create(rp->ai_family, 1);
+        if (protocol == IPPROTO_TCP) {
+            fd = flb_net_socket_create(rp->ai_family, 1);
+        } else {
+            fd = flb_net_socket_create_udp(rp->ai_family, 1);
+        }
         if (fd == -1) {
             flb_error("Error creating server socket, retrying");
             continue;
         }
 
-        flb_net_socket_tcp_nodelay(fd);
+        if (protocol == IPPROTO_TCP) {
+            flb_net_socket_tcp_nodelay(fd);
+        }
         flb_net_socket_reset(fd);
 
-        ret = flb_net_bind(fd, rp->ai_addr, rp->ai_addrlen, 128);
+        ret = flb_net_bind(fd, rp->ai_addr, rp->ai_addrlen, 128, protocol);
         if(ret == -1) {
             flb_warn("Cannot listen on %s port %s", listen_addr, port);
             flb_socket_close(fd);
@@ -324,7 +340,7 @@ flb_sockfd_t flb_net_server(char *port, char *listen_addr)
 }
 
 int flb_net_bind(flb_sockfd_t fd, const struct sockaddr *addr,
-                 socklen_t addrlen, int backlog)
+                 socklen_t addrlen, int backlog, int protocol)
 {
     int ret;
 
@@ -334,10 +350,12 @@ int flb_net_bind(flb_sockfd_t fd, const struct sockaddr *addr,
         return ret;
     }
 
-    ret = listen(fd, backlog);
-    if(ret == -1 ) {
-        flb_error("Error setting up the listener");
-        return -1;
+    if (protocol == IPPROTO_TCP) {
+        ret = listen(fd, backlog);
+        if(ret == -1 ) {
+            flb_error("Error setting up the listener");
+            return -1;
+        }
     }
 
     return ret;
