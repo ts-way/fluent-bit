@@ -76,13 +76,17 @@ static int syslog_server_unix_create(struct flb_syslog *ctx)
 
 static int syslog_server_net_create(struct flb_syslog *ctx)
 {
-    ctx->server_fd = flb_net_server(ctx->tcp_port, ctx->listen);
+    if (ctx->mode == FLB_SYSLOG_TCP) {
+        ctx->server_fd = flb_net_server_create(ctx->port, ctx->listen, IPPROTO_TCP);
+    } else {
+        ctx->server_fd = flb_net_server_create(ctx->port, ctx->listen, IPPROTO_UDP);
+    }
     if (ctx->server_fd > 0) {
-        flb_info("[in_syslog] TCP server binding %s:%s", ctx->listen, ctx->tcp_port);
+        flb_info("[in_syslog] Server binding %s:%s", ctx->listen, ctx->port);
     }
     else {
         flb_error("[in_syslog] could not bind address %s:%s. Aborting",
-                  ctx->listen, ctx->tcp_port);
+                  ctx->listen, ctx->port);
         return -1;
     }
 
@@ -95,7 +99,7 @@ int syslog_server_create(struct flb_syslog *ctx)
 {
     int ret;
 
-    if (ctx->mode == FLB_SYSLOG_TCP) {
+    if (ctx->mode == FLB_SYSLOG_TCP || ctx->mode == FLB_SYSLOG_UDP) {
         ret = syslog_server_net_create(ctx);
     }
     else {
@@ -119,7 +123,7 @@ int syslog_server_destroy(struct flb_syslog *ctx)
     }
     else {
         flb_free(ctx->listen);
-        flb_free(ctx->tcp_port);
+        flb_free(ctx->port);
     }
 
     close(ctx->server_fd);

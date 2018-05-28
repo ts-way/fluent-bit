@@ -57,6 +57,9 @@ struct flb_syslog *syslog_conf_create(struct flb_input_instance *i_ins,
         else if (strcasecmp(tmp, "tcp") == 0) {
             ctx->mode = FLB_SYSLOG_TCP;
         }
+        else if (strcasecmp(tmp, "udp") == 0) {
+            ctx->mode = FLB_SYSLOG_UDP;
+        }
         else {
             flb_error("[in_syslog] Unknown syslog mode %s", tmp);
             flb_free(ctx);
@@ -67,8 +70,8 @@ struct flb_syslog *syslog_conf_create(struct flb_input_instance *i_ins,
         ctx->mode = FLB_SYSLOG_UNIX_UDP;
     }
 
-    /* Check if TCP mode was requested */
-    if (ctx->mode == FLB_SYSLOG_TCP) {
+    /* Check if TCP/UDP mode was requested */
+    if (ctx->mode == FLB_SYSLOG_TCP || ctx->mode == FLB_SYSLOG_UDP) {
         /* Listen interface */
         if (!i_ins->host.listen) {
             tmp = flb_input_get_property("listen", i_ins);
@@ -85,11 +88,11 @@ struct flb_syslog *syslog_conf_create(struct flb_input_instance *i_ins,
 
         /* TCP port */
         if (i_ins->host.port == 0) {
-            ctx->tcp_port = flb_strdup("5140");
+            ctx->port = flb_strdup("5140");
         }
         else {
             snprintf(port, sizeof(port) - 1, "%d", i_ins->host.port);
-            ctx->tcp_port = flb_strdup(port);
+            ctx->port = flb_strdup(port);
         }
     }
 
